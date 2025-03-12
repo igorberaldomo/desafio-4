@@ -4,13 +4,18 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strings"
 	"testing"
 )
 
 func TestFindTempHandler(t *testing.T) {
 	s:= httptest.NewServer(http.HandlerFunc(FindTempHandler))
 
-	req := httptest.NewRequest(http.MethodGet, s.URL+"/?cep=78050040", nil)
+	req,err := http.NewRequest(http.MethodGet, s.URL+"?cep=78050040", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	client := &http.Client{}
 	res,err := client.Do(req)
@@ -24,9 +29,12 @@ func TestFindTempHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := `{"temp_C":28.5,"temp_F":28.5,"temp_K":28.5}`
+	wantRegexp := regexp.MustCompile(`^{"temp_C":\d+(\.\d+)?,"temp_F":\d+(\.\d+)?,"temp_K":\d+(\.\d+)?}$`)
 
-	if string(body) != want {
-		t.Errorf("want %q, got %q", want, string(body))
+	sbody :=string(body)
+	sbody = strings.Trim(sbody, " \n")
+
+	if !wantRegexp.MatchString(sbody) {
+		t.Fatalf("want string is not valid '%s' ", sbody)
 	}
 }
