@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 )
 
@@ -69,67 +70,86 @@ type Weather struct {
 }
 
 func main() {
-	for _, cep := range os.Args[1:] {
-		if len(cep) != 8 {
-			err := fmt.Errorf("CEP inválido: %s", cep)
+	http.HandleFunc("/", FindTempHandler)
+	http.ListenAndServe(":8080", nil)
+}
+
+func FindTempHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	cep := r.URL.Query().Get("cep")
+
+	// request para pegar localidade
+	if len(cep) == 8 {
+	req, err := http.Get("https://viacep.com.br/ws/" + cep + "/json/")
+
+	if req.StatusCode != 200 {
+		if req.StatusCode == 400 {
+			err = fmt.Errorf("bad request")
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		// request para pegar localidade
-		req, err := http.Get("https://viacep.com.br/ws/" + cep + "/json/")
-		if req.StatusCode != 200 {
-			if req.StatusCode == 400 {
-				err = fmt.Errorf("bad request")
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			if req.StatusCode == 404 {
-				err = fmt.Errorf("can not find zipcode")
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			if req.StatusCode == 422 {
-				err = fmt.Errorf("invalid  zipcode")
-				fmt.Println(err)
-				os.Exit(1)
-			}
+		if req.StatusCode == 404 {
+			err = fmt.Errorf("can not find zipcode")
+			fmt.Println(err)
+			os.Exit(1)
 		}
-		if err != nil {
-			fmt.Println("error in requisition via CEP")
+		if req.StatusCode == 422 {
+			err = fmt.Errorf("invalid  zipcode")
+			fmt.Println(err)
+			os.Exit(1)
 		}
-		defer req.Body.Close()
+	}
+	if err != nil {
+		fmt.Println("error in requisition via CEP")
+	}
+	defer req.Body.Close()
 
-		res, err := io.ReadAll(req.Body)
-		if err != nil {
-			fmt.Println("error in reading the body via CEP")
-		}
-		var data ViaCEP
-		fmt.Println(data)
-		err = json.Unmarshal(res, &data)
-		if err != nil {
-			fmt.Println("error in unmarshal via CEP")
-		}
-		local := data.Localidade
-		fmt.Println(local)
+	res, err := io.ReadAll(req.Body)
+	if err != nil {
+		fmt.Println("error in reading the body via CEP")
+	}
+	var data ViaCEP
+	fmt.Println(data)
+	err = json.Unmarshal(res, &data)
+	if err != nil {
+		fmt.Println("error in unmarshal via CEP")
+	}
+	local := data.Localidade
 
-		// novo request para pegar a temperatura
-		req2, err2 := http.Get("http://api.weatherapi.com/v1/current.json?key=18525c8de5ac479f994185201250303&q=" + local + "&aqi=no")
+	url := "http://api.weatherapi.com/v1/current.json?key=18525c8de5ac479f994185201250303&q=" + neturl.QueryEscape(local) + "&aqi=no"
 
-		if err2 != nil {
-			fmt.Println("error in requisition via WeatherAPI")
-		}
-		defer req2.Body.Close()
+	// novo request para pegar a temperatura
+	req2, err2 := http.Get(url)
+	if err2 != nil {
+		fmt.Println("error in requisition via WeatherAPI")
+	}
+	defer req2.Body.Close()
 
-		res2, err2 := io.ReadAll(req2.Body)
-		if err2 != nil {
-			fmt.Println("error in reading the body via WeatherAPI")
-		}
-		var data2 Weather
-		err2 = json.Unmarshal(res2, &data2)
-		if err2 != nil {
-			fmt.Println("error in unmarshal via WeatherAPI")
-		}
-		fmt.Println(data2)
+	res2, err2 := io.ReadAll(req2.Body)
+	if err2 != nil {
+		fmt.Println("error in reading the body via WeatherAPI")
+	}
+	var data2 Weather
+	err2 = json.Unmarshal(res2, &data2)
+	if err2 != nil {
+		fmt.Println("error in unmarshal via WeatherAPI")
 	}
 
+	tempC := data2.Current.TempC
+	tempF := tempC*1.8 + 32
+	tempK := tempC + 273
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"temp_C": tempC,
+		"temp_F": tempF,
+		"temp_K": tempK,
+	})
+	}else {
+		return 
+	}
 }
