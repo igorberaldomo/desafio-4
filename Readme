@@ -4,5 +4,5 @@ para executar o API utilize o docker-composer.yaml para iniciar o container e ac
     localhost:8080/?cep=
     passe o cep na url
 
-exemplo:
+deployed at:
 https://desafio-4-1036825628379.us-central1.run.app/?cep=29902555
