@@ -1,6 +1,11 @@
 version: '3'
 
 services:
+  test:
+    container_name: test
+    build: 
+      context: .
+      dockerfile: ./dockerfile-test
   main:
     container_name: main
     build: 
@@ -8,4 +13,3 @@ services:
       dockerfile: ./dockerfile
     ports: 
       - 8080:8080
-  
