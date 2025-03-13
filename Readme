@@ -1,0 +1,5 @@
+Esse é um desafio que faver uma consulta na api viacep e wheatherapi e retornar as temperaturas em celsius, fahrenheit e kelvin
+
+para executar o API utilize o docker-composer.yaml para iniciar o container e acesse
+    localhost:8080/?cep=
+    passe o cep na url
