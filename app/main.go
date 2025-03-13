@@ -84,7 +84,9 @@ func FindTempHandler(w http.ResponseWriter, r *http.Request) {
 	// request para pegar localidade
 	if len(cep) == 8 {
 	req, err := http.Get("https://viacep.com.br/ws/" + cep + "/json/")
-
+	if err != nil {
+		fmt.Println("error in requisition via CEP")
+	}
 	if req.StatusCode != 200 {
 		if req.StatusCode == 400 {
 			err = fmt.Errorf("bad request")
@@ -102,9 +104,7 @@ func FindTempHandler(w http.ResponseWriter, r *http.Request) {
 			os.Exit(1)
 		}
 	}
-	if err != nil {
-		fmt.Println("error in requisition via CEP")
-	}
+	
 	defer req.Body.Close()
 
 	res, err := io.ReadAll(req.Body)
