@@ -3,3 +3,6 @@ Esse é um desafio que faver uma consulta na api viacep e wheatherapi e retornar
 para executar o API utilize o docker-composer.yaml para iniciar o container e acesse
     localhost:8080/?cep=
     passe o cep na url
+
+exemplo:
+https://desafio-4-1036825628379.us-central1.run.app/?cep=29902555
