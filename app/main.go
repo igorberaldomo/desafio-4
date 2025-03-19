@@ -7,6 +7,7 @@ import (
 	"net/http"
 	neturl "net/url"
 	"os"
+
 )
 
 type ViaCEP struct {
@@ -87,18 +88,18 @@ func FindTempHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("error in requisition via CEP")
 	}
-	if req.StatusCode != 200 {
-		if req.StatusCode == 400 {
+	switch req.StatusCode {
+		case http.StatusBadRequest: {
 			err = fmt.Errorf("bad request")
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		if req.StatusCode == 404 {
+		case http.StatusNotFound: {
 			err = fmt.Errorf("can not find zipcode")
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		if req.StatusCode == 422 {
+		case http.StatusUnprocessableEntity:  {
 			err = fmt.Errorf("invalid  zipcode")
 			fmt.Println(err)
 			os.Exit(1)
