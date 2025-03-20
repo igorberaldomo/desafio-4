@@ -2,12 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	neturl "net/url"
 	"os"
-
 )
 
 type ViaCEP struct {
@@ -77,80 +75,94 @@ func main() {
 
 func FindTempHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
-		w.WriteHeader(http.StatusNotFound)
+		http.Error(w, "No page found", http.StatusNotFound)
 		return
 	}
+
 	cep := r.URL.Query().Get("cep")
+
+	if len(cep) != 8 {
+		http.Error(w, "invalid cep", http.StatusUnprocessableEntity)
+		os.Exit(1)
+		return
+	}
 
 	// request para pegar localidade
 	if len(cep) == 8 {
-	req, err := http.Get("http://viacep.com.br/ws/" + cep + "/json/")
-	if err != nil {
-		fmt.Println("error in requisition via CEP")
-	}
-	switch req.StatusCode {
-		case http.StatusBadRequest: {
-			err = fmt.Errorf("bad request")
-			fmt.Println(err)
-			os.Exit(1)
+		req, err := http.Get("http://viacep.com.br/ws/" + cep + "/json/")
+		if err != nil {
+			http.Error(w, "error in requisition via CEP", http.StatusInternalServerError)
+			return
 		}
-		case http.StatusNotFound: {
-			err = fmt.Errorf("can not find zipcode")
-			fmt.Println(err)
-			os.Exit(1)
+		switch req.StatusCode {
+		case http.StatusBadRequest:
+			{
+				http.Error(w, "bad request", http.StatusBadRequest)
+				os.Exit(1)
+				return
+			}
+		case http.StatusNotFound:
+			{
+				http.Error(w, "cannot find zipcode", http.StatusNotFound)
+				os.Exit(1)
+				return
+			}
+		case http.StatusUnprocessableEntity:
+			{
+				http.Error(w, "invalid zipcode", http.StatusUnprocessableEntity)
+				os.Exit(1)
+				return
+			}
 		}
-		case http.StatusUnprocessableEntity:  {
-			err = fmt.Errorf("invalid  zipcode")
-			fmt.Println(err)
-			os.Exit(1)
+
+		defer req.Body.Close()
+
+		res, err := io.ReadAll(req.Body)
+		if err != nil {
+			http.Error(w, "error in reading the body via CEP", http.StatusInternalServerError)
+			return
 		}
-	}
-	
-	defer req.Body.Close()
+		var data ViaCEP
 
-	res, err := io.ReadAll(req.Body)
-	if err != nil {
-		fmt.Println("error in reading the body via CEP")
-	}
-	var data ViaCEP
-	fmt.Println(data)
-	err = json.Unmarshal(res, &data)
-	if err != nil {
-		fmt.Println("error in unmarshal via CEP")
-	}
-	local := data.Localidade
+		err = json.Unmarshal(res, &data)
+		if err != nil {
+			http.Error(w, "error in unmarshal via CEP", http.StatusInternalServerError)
+			return
+		}
+		local := data.Localidade
 
-	url := "http://api.weatherapi.com/v1/current.json?key=18525c8de5ac479f994185201250303&q=" + neturl.QueryEscape(local) + "&aqi=no"
+		url := "http://api.weatherapi.com/v1/current.json?key=18525c8de5ac479f994185201250303&q=" + neturl.QueryEscape(local) + "&aqi=no"
 
-	// novo request para pegar a temperatura
-	req2, err2 := http.Get(url)
-	if err2 != nil {
-		fmt.Println("error in requisition via WeatherAPI")
-	}
-	defer req2.Body.Close()
+		// novo request para pegar a temperatura
+		req2, err2 := http.Get(url)
+		if err2 != nil {
+			http.Error(w, "error in requisition via WeatherAPI", http.StatusInternalServerError)
+			return
+		}
+		defer req2.Body.Close()
 
-	res2, err2 := io.ReadAll(req2.Body)
-	if err2 != nil {
-		fmt.Println("error in reading the body via WeatherAPI")
-	}
-	var data2 Weather
-	err2 = json.Unmarshal(res2, &data2)
-	if err2 != nil {
-		fmt.Println("error in unmarshal via WeatherAPI")
-	}
+		res2, err2 := io.ReadAll(req2.Body)
+		if err2 != nil {
+			http.Error(w, "error in reading the body via WeatherAPI", http.StatusInternalServerError)
+			return
+		}
+		var data2 Weather
+		err2 = json.Unmarshal(res2, &data2)
+		if err2 != nil {
+			http.Error(w, "error in unmarshal via WeatherAPI", http.StatusInternalServerError)
+			return
+		}
 
-	tempC := data2.Current.TempC
-	tempF := tempC*1.8 + 32
-	tempK := tempC + 273
+		tempC := data2.Current.TempC
+		tempF := tempC*1.8 + 32
+		tempK := tempC + 273
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"temp_C": tempC,
-		"temp_F": tempF,
-		"temp_K": tempK,
-	})
-	}else {
-		return 
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"temp_C": tempC,
+			"temp_F": tempF,
+			"temp_K": tempK,
+		})
 	}
 }
